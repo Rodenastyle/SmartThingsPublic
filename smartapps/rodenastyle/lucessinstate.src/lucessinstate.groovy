@@ -1,7 +1,7 @@
 /**
- *  ControlAsistencias
+ *  LucesSinState
  *
- *  Copyright 2017 Sergio Rodenas
+ *  Copyright 2017 Sergio R&oacute;denas
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -14,10 +14,10 @@
  *
  */
 definition(
-    name: "ControlAsistencias",
+    name: "LucesSinState",
     namespace: "Rodenastyle",
     author: "Sergio Rodenas",
-    description: "Practica entregable Smart things",
+    description: "Entregable LucesSinState",
     category: "My Apps",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
     iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
@@ -25,28 +25,9 @@ definition(
 
 
 preferences {
-	page(
-    	name: "pageDevicePreferences",
-        title: "Dispositivos",
-        nextPage: "pageCommunicationPreferences",
-        install: false,
-        unistall: true
-    ){
-    	section([hideable: true, hidden: true], "Dispositivos de presencia"){
-        	input "presenceSensor", "capability.presenceSensor", title: "Seleccione dispositivos"
-        }
-    }
-    
-    page(
-    	name: "pageCommunicationPreferences",
-        title: "Preferencias de comunicacion",
-        install: true,
-        unistall: true
-    ){
-    	section([hideable: true, hidden: true], "Configurar modo"){
-        	input "motionSensors", "enum", title: "Seleccione el modo en el que se mandaran notificaciones", options: ["home", "work", "away"]
-        }
-    }
+	section("Home bulbs") {
+		input "lights", "capability.switch", multiple: true
+	}
 }
 
 def installed() {
@@ -63,7 +44,29 @@ def updated() {
 }
 
 def initialize() {
-	// TODO: subscribe to attributes, devices, locations, etc.
+	subscribe lights, "switch.on", greenPowerLightsDaemon
 }
 
-// TODO: implement event handlers
+def greenPowerLightsDaemon(evt){
+	log.debug "Checking lights"
+	runIn(5, greenPowerLightsCheck)
+}
+
+def greenPowerLightsCheck(){
+	lights
+    	.clone() //Do not edit default sensors
+    	.findAll{
+        	//Check whether bulbs are on
+            it.currentValue("switch") == "on"
+        }
+        .sort{
+        	//Order them by last state change (to on)
+            it.currentState("switch").getDate()
+        }
+        .reverse() //Reverse the order to put the last bulb in the first place and do not remove it later
+        .drop(1) //Delete last updated light (this also dodges app turn off an only one light)
+        .each{
+       	 	//Delete rest of bulbs
+        	it.off()
+        }
+}
